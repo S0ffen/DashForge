@@ -1,9 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/app/lib/supabase/client"; // lub "../lib/supabase/client"
+import { supabase } from "@/app/lib/supabase/client";
 
-// można sterować domeną z env, fallback na dashforge.com
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// Możesz kontrolować domenę loginów przez ENV
 const PSEUDO_DOMAIN = process.env.NEXT_PUBLIC_LOGIN_DOMAIN ?? "dashforge.com";
 
 function toEmail(input: string) {
@@ -14,31 +20,30 @@ function toEmail(input: string) {
 }
 
 export default function LoginPage() {
-  const [loginOrEmail, setLoginOrEmail] = useState("adrian");
-  const [pass, setPass] = useState("Test4321!");
+  const [loginOrEmail, setLoginOrEmail] = useState("");
+  const [pass, setPass] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [who, setWho] = useState<string | null>(null);
 
-  const router = useRouter(); // ⬅️ do nawigacji
+  const router = useRouter();
 
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
 
     const email = toEmail(loginOrEmail);
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password: pass,
     });
 
     if (error) {
-      setMsg(`Błąd: ${error.message}`);
+      setMsg(`❌ Błąd: ${error.message}`);
     } else {
-      setMsg("Zalogowano ✅");
-      // pobierz usera
       const u = await supabase.auth.getUser();
       setWho(u.data.user?.email ?? null);
-      // ⬅️ przekierowanie np. do /dashboard
+      setMsg("✅ Zalogowano");
       router.push("/dashboard");
     }
   }
@@ -46,7 +51,7 @@ export default function LoginPage() {
   async function onLogout() {
     await supabase.auth.signOut();
     setWho(null);
-    setMsg("Wylogowano");
+    setMsg("👋 Wylogowano");
   }
 
   useEffect(() => {
@@ -54,32 +59,61 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <main className="max-w-sm mx-auto p-6 space-y-3">
-      <h1 className="text-xl font-semibold">Logowanie (email lub login)</h1>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold text-center">
+            Logowanie
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="login">Email lub login</Label>
+              <Input
+                id="login"
+                value={loginOrEmail}
+                onChange={(e) => setLoginOrEmail(e.target.value)}
+                placeholder="np. Adrian"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Hasło</Label>
+              <Input
+                id="password"
+                type="password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                placeholder="********"
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full">
+              Zaloguj
+            </Button>
+          </form>
 
-      <form onSubmit={onLogin} className="flex flex-col gap-2">
-        <input
-          className="border p-2 rounded"
-          value={loginOrEmail}
-          onChange={(e) => setLoginOrEmail(e.target.value)}
-          placeholder="Email lub login (np. Adrian)"
-        />
-        <input
-          className="border p-2 rounded"
-          type="password"
-          value={pass}
-          onChange={(e) => setPass(e.target.value)}
-          placeholder="Hasło"
-        />
-        <button className="bg-black text-white rounded p-2">Zaloguj</button>
-      </form>
+          <Button
+            variant="ghost"
+            className="w-full mt-2 text-sm"
+            type="button"
+            onClick={onLogout}
+          >
+            Wyloguj
+          </Button>
 
-      <button className="underline text-sm" onClick={onLogout}>
-        Wyloguj
-      </button>
+          {msg && (
+            <Alert className="mt-4">
+              <AlertDescription>{msg}</AlertDescription>
+            </Alert>
+          )}
 
-      {msg && <p>{msg}</p>}
-      <p className="text-sm text-gray-600">Zalogowany jako: {who ?? "—"}</p>
-    </main>
+          <p className="mt-4 text-sm text-gray-600 text-center">
+            Zalogowany jako: {who ?? "—"}
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
