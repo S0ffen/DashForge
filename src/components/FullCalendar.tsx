@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -22,9 +22,20 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function CalendarWithDialog() {
   const [events, setEvents] = useState<EventInput[]>([]);
+  const [event, setEvent] = useState<EventInput | null>(null);
+  const [showEventDetails, setShowEventDetails] = useState(false);
   const [open, setOpen] = useState(false);
   const [dateISO, setDateISO] = useState<string>("");
   const [kind, setKind] = useState<"nauka" | "ćwiczenia" | "">("");
@@ -56,13 +67,41 @@ export default function CalendarWithDialog() {
     setMinutes(0);
   }
 
+  useEffect(() => {
+    const loadEvents = async () => {
+      const res = await fetch("/api/getEvents");
+      const data = await res.json();
+      if (res.ok) {
+        const ev = data.map((d: any) => ({
+          id: d.id,
+          title: `${d.kind} — ${d.minutes} min`,
+          start: d.start,
+          allDay: true,
+        }));
+        setEvents(ev);
+      } else {
+        alert(data?.error?.message ?? "Błąd ładowania");
+      }
+    };
+    loadEvents();
+  }, []);
+
+  useEffect(() => {
+    console.log("events updated", events);
+  }, [events]);
+
+  const eventClick = (info: any) => {
+    setShowEventDetails(true);
+    setEvent(info.event);
+  };
+
   return (
     <>
       <FullCalendar
         plugins={[dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
         events={events}
-        eventClick={(info) => alert(info.event.title)}
+        eventClick={eventClick}
         dateClick={(info) => {
           setDateISO(new Date(info.dateStr).toISOString());
           setOpen(true);
@@ -114,6 +153,23 @@ export default function CalendarWithDialog() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {showEventDetails && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{event?.title}</CardTitle>
+            <CardDescription>Card Description</CardDescription>
+            <CardAction>
+              <Button onClick={() => setShowEventDetails(false)}>X</Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <p>{event?.id}</p>
+            <p>{event?.start?.toString()}</p>
+            <p>{event?.end?.toString()}</p>
+            <p>{event?.allDay ? "Cały dzień" : "Nie cały dzień"}</p>
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 }
