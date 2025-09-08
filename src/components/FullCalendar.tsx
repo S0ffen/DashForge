@@ -31,47 +31,104 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FaEdit } from "react-icons/fa";
+import { IoCloseCircleSharp } from "react-icons/io5";
+
+interface EventDB {
+  id: string;
+  userId: string;
+  start: string; // ISO date string
+  minutes: number;
+  kind: string;
+  notes?: string;
+  created_at: string; // ISO date string
+  updated_at: string; // ISO date string
+}
 
 export default function CalendarWithDialog() {
+  const [eventsDB, setEventsDB] = useState<EventDB[]>([]);
   const [events, setEvents] = useState<EventInput[]>([]);
-  const [event, setEvent] = useState<EventInput | null>(null);
+  const [signleEvent, setSingleEvent] = useState<EventDB | null>(null);
   const [showEventDetails, setShowEventDetails] = useState(false);
   const [open, setOpen] = useState(false);
   const [dateISO, setDateISO] = useState<string>("");
   const [kind, setKind] = useState<"nauka" | "ćwiczenia" | "">("");
   const [minutes, setMinutes] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
+  //Edycja elementu
+  const [editing, setEditing] = useState(false);
 
   async function submit() {
     if (!dateISO || !kind || !minutes) return;
     setSubmitting(true);
-    const res = await fetch("/api/saveEvents", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ start: dateISO, kind, minutes }),
-    });
-    const data = await res.json();
-    setSubmitting(false);
-    if (!res.ok) return alert(data?.error?.message ?? "Błąd");
-    setEvents((prev) => [
-      ...prev,
-      {
-        id: data.id,
-        title: `${data.kind} — ${data.minutes} min`,
-        start: data.start,
-        allDay: true,
-      },
-    ]);
-    setOpen(false);
-    setKind("");
-    setMinutes(0);
+    if (editing && signleEvent) {
+      // 🔹 edycja istniejącego eventu
+      const res = await fetch(`/api/updateEvents/${signleEvent.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: signleEvent.id,
+          start: dateISO,
+          kind,
+          minutes,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data?.error ?? "Błąd");
+
+      // aktualizacja w state
+      setEventsDB((prev) => prev.map((ev) => (ev.id === data.id ? data : ev)));
+      setEvents((prev) =>
+        prev.map((ev) =>
+          ev.id === data.id
+            ? {
+                ...ev,
+                title: `${data.kind} — ${data.minutes} min`,
+                start: data.start,
+              }
+            : ev
+        )
+      );
+    } else {
+      // 🔹 dodanie nowego elementu
+      const res = await fetch("/api/saveEvents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ start: dateISO, kind, minutes }),
+      });
+      const data = await res.json();
+      setSubmitting(false);
+      if (!res.ok) return alert(data?.error?.message ?? "Błąd");
+
+      // rzutujemy do interfejsu EventDB który jest zgodny co jest w bazie
+      setEventsDB((prev) => [...prev, data]);
+
+      // dodajemy do tablicy kalendarza
+
+      setEvents((prev) => [
+        ...prev,
+        {
+          id: data.id,
+          title: `${data.kind} — ${data.minutes} min`,
+          start: data.start,
+          allDay: true,
+        },
+      ]);
+      setOpen(false);
+      setKind("");
+      setMinutes(0);
+    }
   }
 
   useEffect(() => {
     const loadEvents = async () => {
       const res = await fetch("/api/getEvents");
       const data = await res.json();
+      console.log("loaded events", { res, data });
       if (res.ok) {
+        // pełne dane z bazy zgodne z interfacem EventDB
+        setEventsDB(data);
         const ev = data.map((d: any) => ({
           id: d.id,
           title: `${d.kind} — ${d.minutes} min`,
@@ -88,11 +145,15 @@ export default function CalendarWithDialog() {
 
   useEffect(() => {
     console.log("events updated", events);
+    console.log("eventsDB", eventsDB);
   }, [events]);
 
   const eventClick = (info: any) => {
     setShowEventDetails(true);
-    setEvent(info.event);
+    const eventId = info.event.id;
+    const infoEvent = eventsDB.find((event) => event.id === eventId) ?? null;
+    console.log("infoEvent", infoEvent);
+    setSingleEvent(infoEvent);
   };
 
   return (
@@ -112,7 +173,8 @@ export default function CalendarWithDialog() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Dodaj wpis ({new Date(dateISO).toLocaleDateString()})
+              {editing ? "Edytuj wpis" : "Dodaj wpis"} (
+              {dateISO ? new Date(dateISO).toLocaleDateString() : ""}){" "}
             </DialogTitle>
           </DialogHeader>
 
@@ -153,20 +215,35 @@ export default function CalendarWithDialog() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
       {showEventDetails && (
         <Card>
           <CardHeader>
-            <CardTitle>{event?.title}</CardTitle>
+            <CardTitle>
+              {signleEvent?.kind} - {signleEvent?.minutes}
+            </CardTitle>
             <CardDescription>Card Description</CardDescription>
             <CardAction>
-              <Button onClick={() => setShowEventDetails(false)}>X</Button>
+              <Button
+                onClick={() => {
+                  setOpen(true);
+                  setDateISO(signleEvent?.start || "");
+                  setKind(signleEvent?.kind as any);
+                  setEditing(true); // tryb edycji
+                  setMinutes(signleEvent?.minutes || 0);
+                }}
+              >
+                <FaEdit />
+              </Button>
+              <Button onClick={() => setShowEventDetails(false)}>
+                <IoCloseCircleSharp />
+              </Button>
             </CardAction>
           </CardHeader>
           <CardContent>
-            <p>{event?.id}</p>
-            <p>{event?.start?.toString()}</p>
-            <p>{event?.end?.toString()}</p>
-            <p>{event?.allDay ? "Cały dzień" : "Nie cały dzień"}</p>
+            <p>ID: {signleEvent?.id}</p>
+            <p>START:{signleEvent?.start?.toString()}</p>
+            <p>Czas trwania:{signleEvent?.minutes}</p>
           </CardContent>
         </Card>
       )}
