@@ -31,8 +31,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+
 import { FaEdit } from "react-icons/fa";
 import { IoCloseCircleSharp } from "react-icons/io5";
+import { MdDelete } from "react-icons/md";
 
 interface EventDB {
   id: string;
@@ -63,6 +77,8 @@ export default function CalendarWithDialog() {
     setSubmitting(true);
     if (editing && signleEvent) {
       // 🔹 edycja istniejącego eventu
+      // 🔹 PUT (aktualizacja istniejącego zasobu)
+      // PUT /api/updateEvents/[id] wysyłam pod taki endpoint i potem na podstawie id edytuję
       const res = await fetch(`/api/updateEvents/${signleEvent.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -73,6 +89,7 @@ export default function CalendarWithDialog() {
           minutes,
         }),
       });
+      console.log("update res", res);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data?.error ?? "Błąd");
@@ -90,8 +107,13 @@ export default function CalendarWithDialog() {
             : ev
         )
       );
+      setOpen(false);
+      setKind("");
+      setMinutes(0);
+      setSubmitting(false);
     } else {
       // 🔹 dodanie nowego elementu
+      // 🔹 POST (tworzenie nowego zasobu)
       const res = await fetch("/api/saveEvents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,8 +140,20 @@ export default function CalendarWithDialog() {
       setOpen(false);
       setKind("");
       setMinutes(0);
+      setSubmitting(false);
     }
   }
+  const DeleteElement = async () => {
+    if (!signleEvent) return;
+    const res = await fetch(`/api/getEvents/${signleEvent.id}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    console.log("delete res", res, data);
+    setShowEventDetails(false);
+    setEvents((prev) => prev.filter((ev) => ev.id !== signleEvent.id));
+    setEventsDB((prev) => prev.filter((ev) => ev.id !== signleEvent.id));
+  };
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -203,6 +237,7 @@ export default function CalendarWithDialog() {
                 }
               />
             </div>
+            <Textarea placeholder="Type your message here." />
           </div>
 
           <DialogFooter>
@@ -238,6 +273,30 @@ export default function CalendarWithDialog() {
               <Button onClick={() => setShowEventDetails(false)}>
                 <IoCloseCircleSharp />
               </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">
+                    <MdDelete />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Do you want to delete selected element?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete
+                      element from database.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => DeleteElement()}>
+                      Continue
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardAction>
           </CardHeader>
           <CardContent>
