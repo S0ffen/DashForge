@@ -54,7 +54,7 @@ interface EventDB {
   start: string; // ISO date string
   minutes: number;
   kind: string;
-  notes?: string;
+  note?: string;
   created_at: string; // ISO date string
   updated_at: string; // ISO date string
 }
@@ -71,6 +71,8 @@ export default function CalendarWithDialog() {
   const [submitting, setSubmitting] = useState(false);
   //Edycja elementu
   const [editing, setEditing] = useState(false);
+  //Notatka dla eventu
+  const [notes, setNotes] = useState("");
 
   async function submit() {
     if (!dateISO || !kind || !minutes) return;
@@ -87,6 +89,7 @@ export default function CalendarWithDialog() {
           start: dateISO,
           kind,
           minutes,
+          notes,
         }),
       });
       console.log("update res", res);
@@ -117,7 +120,7 @@ export default function CalendarWithDialog() {
       const res = await fetch("/api/saveEvents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ start: dateISO, kind, minutes }),
+        body: JSON.stringify({ start: dateISO, kind, minutes, note: notes }),
       });
       const data = await res.json();
       setSubmitting(false);
@@ -141,6 +144,7 @@ export default function CalendarWithDialog() {
       setKind("");
       setMinutes(0);
       setSubmitting(false);
+      setNotes("");
     }
   }
   const DeleteElement = async () => {
@@ -168,6 +172,7 @@ export default function CalendarWithDialog() {
           title: `${d.kind} — ${d.minutes} min`,
           start: d.start,
           allDay: true,
+          backgroundColor: data.kind === "nauka" ? "#3b82f6" : "#22c55e", // niebieski/zielony
         }));
         setEvents(ev);
       } else {
@@ -197,6 +202,7 @@ export default function CalendarWithDialog() {
         initialView="dayGridMonth"
         events={events}
         eventClick={eventClick}
+        eventClassNames={() => ["cursor-pointer"]} // Tailwind
         dateClick={(info) => {
           setDateISO(new Date(info.dateStr).toISOString());
           setOpen(true);
@@ -237,7 +243,11 @@ export default function CalendarWithDialog() {
                 }
               />
             </div>
-            <Textarea placeholder="Type your message here." />
+            <Textarea
+              placeholder="Type your message here."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </div>
 
           <DialogFooter>
@@ -252,7 +262,7 @@ export default function CalendarWithDialog() {
       </Dialog>
 
       {showEventDetails && (
-        <Card>
+        <Card className="mt-4">
           <CardHeader>
             <CardTitle>
               {signleEvent?.kind} - {signleEvent?.minutes}
@@ -300,9 +310,13 @@ export default function CalendarWithDialog() {
             </CardAction>
           </CardHeader>
           <CardContent>
-            <p>ID: {signleEvent?.id}</p>
-            <p>START:{signleEvent?.start?.toString()}</p>
+            <p>ID: {signleEvent?.id}</p> <br />
+            <Input disabled placeholder={signleEvent?.id} />
             <p>Czas trwania:{signleEvent?.minutes}</p>
+            <Input disabled value={signleEvent?.minutes || ""} />
+            <p>Rodzaj: {signleEvent?.kind}</p>
+            <Input disabled value={signleEvent?.kind || ""} />
+            <Textarea disabled value={signleEvent?.note || ""} />
           </CardContent>
         </Card>
       )}

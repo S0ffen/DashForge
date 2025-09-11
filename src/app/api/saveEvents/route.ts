@@ -10,15 +10,15 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
 
-    const { start, kind, minutes } = await req.json();
+    const { start, kind, minutes, note } = await req.json();
     if (!start || !kind || !minutes)
       return Response.json({ error: "missing fields" }, { status: 400 });
-
+    console.log("Received data:", { start, kind, minutes, note });
     const isoStart = new Date(start).toISOString(); // ważne
 
     const { data, error } = await supabase
       .from("calendar_events")
-      .insert([{ start: isoStart, kind, minutes, user_id: user.id }])
+      .insert([{ start: isoStart, kind, minutes, note, user_id: user.id }])
       .select()
       .single();
 
