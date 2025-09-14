@@ -66,7 +66,7 @@ export default function CalendarWithDialog() {
   const [showEventDetails, setShowEventDetails] = useState(false);
   const [open, setOpen] = useState(false);
   const [dateISO, setDateISO] = useState<string>("");
-  const [kind, setKind] = useState<"nauka" | "ćwiczenia" | "">("");
+  const [kind, setKind] = useState<"Learning" | "Exercise" | "">("");
   const [minutes, setMinutes] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
   //Edycja elementu
@@ -89,10 +89,11 @@ export default function CalendarWithDialog() {
           start: dateISO,
           kind,
           minutes,
-          notes,
+          note: notes,
         }),
       });
       console.log("update res", res);
+      console.log("update note", notes);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data?.error ?? "Błąd");
@@ -110,10 +111,6 @@ export default function CalendarWithDialog() {
             : ev
         )
       );
-      setOpen(false);
-      setKind("");
-      setMinutes(0);
-      setSubmitting(false);
     } else {
       // 🔹 dodanie nowego elementu
       // 🔹 POST (tworzenie nowego zasobu)
@@ -140,12 +137,16 @@ export default function CalendarWithDialog() {
           allDay: true,
         },
       ]);
-      setOpen(false);
-      setKind("");
-      setMinutes(0);
-      setSubmitting(false);
-      setNotes("");
     }
+    console.log("here");
+    setOpen(false);
+    setEditing(false);
+    setKind("");
+    setMinutes(0);
+    setSubmitting(false);
+    setNotes("");
+    setShowEventDetails(false);
+    loadEvents(); // odświeżenie listy eventów po dodaniu nowego
   }
   const DeleteElement = async () => {
     if (!signleEvent) return;
@@ -158,27 +159,26 @@ export default function CalendarWithDialog() {
     setEvents((prev) => prev.filter((ev) => ev.id !== signleEvent.id));
     setEventsDB((prev) => prev.filter((ev) => ev.id !== signleEvent.id));
   };
-
+  const loadEvents = async () => {
+    const res = await fetch("/api/getEvents");
+    const data = await res.json();
+    console.log("loaded events", { res, data });
+    if (res.ok) {
+      // pełne dane z bazy zgodne z interfacem EventDB
+      setEventsDB(data);
+      const ev = data.map((d: any) => ({
+        id: d.id,
+        title: `${d.kind} — ${d.minutes} min`,
+        start: d.start,
+        allDay: true,
+        backgroundColor: d.kind === "nauka" ? "#3b82f6" : "#22c55e", // niebieski/zielony
+      }));
+      setEvents(ev);
+    } else {
+      alert(data?.error?.message ?? "Błąd ładowania");
+    }
+  };
   useEffect(() => {
-    const loadEvents = async () => {
-      const res = await fetch("/api/getEvents");
-      const data = await res.json();
-      console.log("loaded events", { res, data });
-      if (res.ok) {
-        // pełne dane z bazy zgodne z interfacem EventDB
-        setEventsDB(data);
-        const ev = data.map((d: any) => ({
-          id: d.id,
-          title: `${d.kind} — ${d.minutes} min`,
-          start: d.start,
-          allDay: true,
-          backgroundColor: data.kind === "nauka" ? "#3b82f6" : "#22c55e", // niebieski/zielony
-        }));
-        setEvents(ev);
-      } else {
-        alert(data?.error?.message ?? "Błąd ładowania");
-      }
-    };
     loadEvents();
   }, []);
 
@@ -193,74 +193,87 @@ export default function CalendarWithDialog() {
     const infoEvent = eventsDB.find((event) => event.id === eventId) ?? null;
     console.log("infoEvent", infoEvent);
     setSingleEvent(infoEvent);
+    setNotes(infoEvent?.note || "");
   };
 
   return (
     <>
-      <FullCalendar
-        plugins={[dayGridPlugin, interactionPlugin]}
-        initialView="dayGridMonth"
-        events={events}
-        eventClick={eventClick}
-        eventClassNames={() => ["cursor-pointer"]} // Tailwind
-        dateClick={(info) => {
-          setDateISO(new Date(info.dateStr).toISOString());
-          setOpen(true);
-        }}
-      />
+      <div className="bg-[#F4EDEA]">
+        <FullCalendar
+          plugins={[dayGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          events={events}
+          eventClick={eventClick}
+          firstDay={1} // tydzień zaczyna się od poniedziałku
+          eventClassNames={() => ["cursor-pointer"]} // Tailwind
+          dateClick={(info) => {
+            setDateISO(new Date(info.dateStr).toISOString());
+            setOpen(true);
+          }}
+        />
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editing ? "Edytuj wpis" : "Dodaj wpis"} (
-              {dateISO ? new Date(dateISO).toLocaleDateString() : ""}){" "}
-            </DialogTitle>
-          </DialogHeader>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editing ? "Edit entry" : "Add entry"} (
+                {dateISO ? new Date(dateISO).toLocaleDateString() : ""}){" "}
+              </DialogTitle>
+            </DialogHeader>
 
-          <div className="space-y-3">
-            <div className="grid gap-2">
-              <Label>Typ</Label>
-              <Select value={kind} onValueChange={(v) => setKind(v as any)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Wybierz" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nauka">nauka</SelectItem>
-                  <SelectItem value="ćwiczenia">ćwiczenia</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <div className="space-y-3">
+              <div className="grid gap-2">
+                <Label>Typ</Label>
+                <Select value={kind} onValueChange={(v) => setKind(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Learning">Learning</SelectItem>
+                    <SelectItem value="Exercise">Exercise</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="grid gap-2">
-              <Label>Minuty</Label>
-              <Input
-                type="number"
-                min={1}
-                value={minutes || ""}
-                onChange={(e) =>
-                  setMinutes(parseInt(e.target.value || "0", 10))
-                }
+              <div className="grid gap-2">
+                <Label>Duration</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={minutes || ""}
+                  onChange={(e) =>
+                    setMinutes(parseInt(e.target.value || "0", 10))
+                  }
+                />
+              </div>
+              <Label>Note</Label>
+              <Textarea
+                placeholder="Type your message here."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
               />
             </div>
-            <Textarea
-              placeholder="Type your message here."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Anuluj
-            </Button>
-            <Button onClick={submit} disabled={submitting || !kind || !minutes}>
-              {submitting ? "Zapisywanie..." : "Zapisz"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setOpen(false);
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={submit}
+                disabled={submitting || !kind || !minutes}
+              >
+                {submitting ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
       {showEventDetails && (
         <Card className="mt-4">
           <CardHeader>
@@ -269,54 +282,80 @@ export default function CalendarWithDialog() {
             </CardTitle>
             <CardDescription>Card Description</CardDescription>
             <CardAction>
-              <Button
-                onClick={() => {
-                  setOpen(true);
-                  setDateISO(signleEvent?.start || "");
-                  setKind(signleEvent?.kind as any);
-                  setEditing(true); // tryb edycji
-                  setMinutes(signleEvent?.minutes || 0);
-                }}
-              >
-                <FaEdit />
-              </Button>
-              <Button onClick={() => setShowEventDetails(false)}>
-                <IoCloseCircleSharp />
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive">
-                    <MdDelete />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Do you want to delete selected element?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete
-                      element from database.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => DeleteElement()}>
-                      Continue
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setOpen(true);
+                    setDateISO(signleEvent?.start || "");
+                    setKind(signleEvent?.kind as any);
+                    setEditing(true); // tryb edycji
+                    setMinutes(signleEvent?.minutes || 0);
+                  }}
+                >
+                  <FaEdit />
+                </Button>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive">
+                      <MdDelete />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Do you want to delete selected element?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently
+                        delete element from database.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => DeleteElement()}>
+                        Continue
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <Button onClick={() => setShowEventDetails(false)}>
+                  <IoCloseCircleSharp />
+                </Button>
+              </div>
             </CardAction>
           </CardHeader>
           <CardContent>
-            <p>ID: {signleEvent?.id}</p> <br />
-            <Input disabled placeholder={signleEvent?.id} />
-            <p>Czas trwania:{signleEvent?.minutes}</p>
-            <Input disabled value={signleEvent?.minutes || ""} />
-            <p>Rodzaj: {signleEvent?.kind}</p>
-            <Input disabled value={signleEvent?.kind || ""} />
-            <Textarea disabled value={signleEvent?.note || ""} />
+            <div>
+              <div className="flex items-center gap-2 mt-2">
+                <span>Event ID: </span>
+                <Input
+                  disabled
+                  placeholder={signleEvent?.id}
+                  className="w-100"
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <span>duration:{signleEvent?.minutes}</span>
+                <Input
+                  disabled
+                  value={signleEvent?.minutes || ""}
+                  className="w-100"
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <p>Kind: {signleEvent?.kind}</p>
+                <Input
+                  disabled
+                  value={signleEvent?.kind || ""}
+                  className="w-100"
+                />
+              </div>
+
+              <p>Note:</p>
+              <Textarea disabled value={signleEvent?.note || ""} />
+            </div>
           </CardContent>
         </Card>
       )}

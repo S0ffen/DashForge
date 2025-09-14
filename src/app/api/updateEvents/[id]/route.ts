@@ -3,7 +3,7 @@ import { createClient } from "@/app/lib/supabase/server";
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -12,9 +12,11 @@ export async function PUT(
     } = await supabase.auth.getUser();
     if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
 
-    const { id } = params;
+    const { id } = await params;
     console.log("Updating event id:", id);
-    const { start, kind, minutes } = await req.json();
+    const { start, kind, minutes, note } = await req.json();
+
+    console.log("Received data:", { start, kind, minutes, note });
 
     if (!start || !kind || !minutes)
       return Response.json({ error: "missing fields" }, { status: 400 });
@@ -27,6 +29,7 @@ export async function PUT(
         start: isoStart,
         kind,
         minutes,
+        note,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
