@@ -50,6 +50,16 @@ export default function Navbar() {
                       </Link>
                     </NavigationMenuLink>
                   </li>
+                  <li>
+                    <NavigationMenuLink asChild>
+                      <Link
+                        href="/WeeklySummary"
+                        className="block rounded-md p-2 hover:bg-muted"
+                      >
+                        Summary
+                      </Link>
+                    </NavigationMenuLink>
+                  </li>
                 </ul>
               </NavigationMenuContent>
             </NavigationMenuItem>

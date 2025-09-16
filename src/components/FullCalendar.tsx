@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 
-import { FaEdit } from "react-icons/fa";
+import { FaEdit, FaThermometerThreeQuarters } from "react-icons/fa";
 import { IoCloseCircleSharp } from "react-icons/io5";
 import { MdDelete } from "react-icons/md";
 
@@ -57,6 +57,14 @@ interface EventDB {
   note?: string;
   created_at: string; // ISO date string
   updated_at: string; // ISO date string
+}
+//Helper - formatowanie minut na godziny i minuty
+function formatMinutes(total: number) {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h && m) return `${h} h ${m} min`;
+  if (h) return `${h} h`;
+  return `${m} min`;
 }
 
 export default function CalendarWithDialog() {
@@ -105,7 +113,7 @@ export default function CalendarWithDialog() {
           ev.id === data.id
             ? {
                 ...ev,
-                title: `${data.kind} — ${data.minutes} min`,
+                title: `${data.kind}`,
                 start: data.start,
               }
             : ev
@@ -132,7 +140,7 @@ export default function CalendarWithDialog() {
         ...prev,
         {
           id: data.id,
-          title: `${data.kind} — ${data.minutes} min`,
+          title: `${data.kind}`,
           start: data.start,
           allDay: true,
         },
@@ -168,7 +176,7 @@ export default function CalendarWithDialog() {
       setEventsDB(data);
       const ev = data.map((d: any) => ({
         id: d.id,
-        title: `${d.kind} — ${d.minutes} min`,
+        title: `${d.kind}`,
         start: d.start,
         allDay: true,
         backgroundColor: d.kind === "nauka" ? "#3b82f6" : "#22c55e", // niebieski/zielony
@@ -193,19 +201,21 @@ export default function CalendarWithDialog() {
     const infoEvent = eventsDB.find((event) => event.id === eventId) ?? null;
     console.log("infoEvent", infoEvent);
     setSingleEvent(infoEvent);
-    setNotes(infoEvent?.note || "");
+    setNotes("");
   };
 
   return (
     <>
-      <div className="bg-[#F4EDEA]">
+      <div className="bg-[#EEE5E9] m-2 p-4 rounded-lg ">
         <FullCalendar
           plugins={[dayGridPlugin, interactionPlugin]}
           initialView="dayGridMonth"
           events={events}
           eventClick={eventClick}
+          eventTextColor="#12263A"
+          height="auto"
           firstDay={1} // tydzień zaczyna się od poniedziałku
-          eventClassNames={() => ["cursor-pointer"]} // Tailwind
+          eventClassNames={() => ["cursor-pointer h-8 text-sm"]} // Tailwind
           dateClick={(info) => {
             setDateISO(new Date(info.dateStr).toISOString());
             setOpen(true);
@@ -275,7 +285,7 @@ export default function CalendarWithDialog() {
         </Dialog>
       </div>
       {showEventDetails && (
-        <Card className="mt-4">
+        <Card className="mt-4 bg-[#EEE5E9]">
           <CardHeader>
             <CardTitle>
               {signleEvent?.kind} - {signleEvent?.minutes}
@@ -345,7 +355,7 @@ export default function CalendarWithDialog() {
                 />
               </div>
               <div className="flex items-center gap-2 mt-2">
-                <p>Kind: {signleEvent?.kind}</p>
+                <p>Activity: {signleEvent?.kind}</p>
                 <Input
                   disabled
                   value={signleEvent?.kind || ""}
